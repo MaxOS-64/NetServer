@@ -6,15 +6,14 @@
  * @author Max Tyson
  */
 
-#ifndef MAXOS_NET_ARP_H
-#define MAXOS_NET_ARP_H
+#ifndef NETSERVER_PROTOCOL_LINK_ARP_H
+#define NETSERVER_PROTOCOL_LINK_ARP_H
 
 #include <cstdint>
+#include <protocol/network/ipv4.h>
 
-#include <net/ipv4.h>
 
-
-namespace MaxOS::net {
+namespace NetServer::protocol::link {
 
 	/**
 	 * @struct ARPMessage
@@ -65,4 +64,4 @@ namespace MaxOS::net {
 }
 
 
-#endif //MAXOS_NET_ARP_H
+#endif //NETSERVER_PROTOCOL_LINK_ARP_H

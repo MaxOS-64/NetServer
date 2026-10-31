@@ -6,8 +6,8 @@
  * @author Max Tyson
  */
 
-#ifndef MAXOS_NET_TCP_H
-#define MAXOS_NET_TCP_H
+#ifndef NETSERVER_PROTOCOL_TRANSPORT_TCP_H
+#define NETSERVER_PROTOCOL_TRANSPORT_TCP_H
 
 #include <cstdint>
 #include <net/ipv4.h>
@@ -15,7 +15,7 @@
 #include <mem.h>
 
 
-namespace MaxOS::net {
+namespace NetServer::protocol::transport {
 
 	typedef uint16_t TransmissionControlProtocolPort;   ///< TCP port @todo: Make TCPPort class and do tcp_port_t
 
@@ -233,4 +233,4 @@ namespace MaxOS::net {
 }
 
 
-#endif //MAXOS_NET_TCP_H
+#endif //NETSERVER_PROTOCOL_TRANSPORT_TCP_H

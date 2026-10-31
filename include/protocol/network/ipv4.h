@@ -6,14 +6,14 @@
  * @author Max Tyson
  */
 
-#ifndef MAXOS_NET_IPV4_H
-#define MAXOS_NET_IPV4_H
+#ifndef NETSERVER_PROTOCOL_NETWORK_IPV4_H
+#define NETSERVER_PROTOCOL_NETWORK_IPV4_H
 
 #include <cstdint>
-#include <net/ethernetframe.h>
+#include <protocol/link/ethernetframe.h>
 
 
-namespace MaxOS::net {
+namespace NetServer::protocol::network {
 
 	typedef uint32_t InternetProtocolAddress;   ///< An IPv4 address @todo: Make IPv4Address class and do ip_t
 	typedef uint32_t SubnetMask;                ///< A subnet mask @todo: Make SubnetMask class and do subnetmask_t
@@ -125,4 +125,4 @@ namespace MaxOS::net {
 }
 
 
-#endif //MAXOS_NET_IPV4_H
+#endif //NETSERVER_PROTOCOL_NETWORK_IPV4_H

@@ -6,7 +6,7 @@
  * @author Max Tyson
  */
 
-#include <net/arp.h>
+#include <protocol/link/arp.h>
 
 using namespace MaxOS;
 using namespace MaxOS::common;

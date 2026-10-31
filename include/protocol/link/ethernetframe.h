@@ -5,19 +5,22 @@
  * @date 11th May 2022
  * @author Max Tyson
  *
- * @todo Make big endian helper functions and clairty (ie be_uint16_t etc)z
+ * @todo Make big endian helper functions and clairty (ie be_uint16_t etc)
  */
 
-#ifndef MAXOS_NET_ETHERNETFRAME_H
-#define MAXOS_NET_ETHERNETFRAME_H
+#ifndef NETSERVER_PROTOCOL_LINK_ETHERNETFRAME_H
+#define NETSERVER_PROTOCOL_LINK_ETHERNETFRAME_H
 
 #include <cstdint>
-#include <map.h>
-#include <drivers/ethernet/ethernet.h>
-#include <memory/memorymanagement.h>
+#include <libcommon/macros.h>
+#include <libcommon/outputStream.h>
+#include <libcommon/map.h>
+#include <libdriver/generic/ethernet.h>
+
+#include "../../../../../libraries/libcommon/include/libcommon/macros.h"
 
 
-namespace MaxOS::net {
+namespace NetServer::protocol::link {
 
 	/**
 	 * @struct EthernetFrameHeader
@@ -69,23 +72,24 @@ namespace MaxOS::net {
 			void send(uint64_t destination, uint8_t* data, uint32_t size);
 	};
 
+
 	/**
 	 * @class EthernetFrameHandler
 	 * @brief Handles incoming Ethernet Frames and routes them to the appropriate payload handlers
 	 */
-	class EthernetFrameHandler : public drivers::ethernet::EthernetDriverEventHandler {
+	class EthernetFrameHandler {
 		protected:
 
-			common::Map<uint16_t, EthernetFramePayloadHandler*> frame_handlers;  ///< The map of frame handlers by type
+			MaxOS::common::Map<uint16_t, EthernetFramePayloadHandler*> frame_handlers;  ///< The map of frame handlers by type
 
-			drivers::ethernet::EthernetDriver* ethernet_driver;                  ///< The driver this frame handler is using
-			common::OutputStream* error_messages;                                ///< The output stream for error messages
+			LibDriver::generic::Ethernet* ethernet_driver;                  ///< The driver this frame handler is using
+			MaxOS::common::OutputStream* error_messages;                                ///< The output stream for error messages
 
 		public:
-			EthernetFrameHandler(drivers::ethernet::EthernetDriver* driver, common::OutputStream* error_messages);
+			EthernetFrameHandler(LibDriver::generic::Ethernet* driver, MaxOS::common::OutputStream* error_messages);
 			~EthernetFrameHandler();
 
-			drivers::ethernet::MediaAccessControlAddress get_mac();
+			LibDriver::generic::MediaAccessControlAddress get_mac();
 			bool data_received(uint8_t* data, uint32_t size) override;
 			void connect_handler(EthernetFramePayloadHandler* handler);
 			void send_ethernet_frame(uint64_t destination_mac, uint16_t frame_type, uint8_t* data, uint32_t size);
@@ -94,4 +98,4 @@ namespace MaxOS::net {
 }
 
 
-#endif //MAXOS_NET_ETHERNETFRAME_H
+#endif //NETSERVER_PROTOCOL_LINK_ETHERNETFRAME_H

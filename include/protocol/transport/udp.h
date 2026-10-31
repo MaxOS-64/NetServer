@@ -6,8 +6,8 @@
  * @author Max Tyson
  */
 
-#ifndef MAXOS_NET_UDP_H
-#define MAXOS_NET_UDP_H
+#ifndef NETSERVER_PROTOCOL_TRANSPORT_UDP_H
+#define NETSERVER_PROTOCOL_TRANSPORT_UDP_H
 
 
 #include <cstdint>
@@ -17,7 +17,7 @@
 #include <mem.h>
 
 
-namespace MaxOS::net {
+namespace NetServer::protocol::transport {
 
 	/**
 	 * @struct UDPHeader
@@ -137,4 +137,4 @@ namespace MaxOS::net {
 }
 
 
-#endif //MAXOS_NET_UDP_H
+#endif //NETSERVER_PROTOCOL_TRANSPORT_UDP_H

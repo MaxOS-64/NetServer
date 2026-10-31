@@ -6,15 +6,15 @@
  * @author Max Tyson
  */
 
-#ifndef MAXOS_NET_ICMP_H
-#define MAXOS_NET_ICMP_H
+#ifndef NETSERVER_PROTOCOL_NETWORK_ICMP_H
+#define NETSERVER_PROTOCOL_NETWORK_ICMP_H
 
 #include <net/ipv4.h>
 #include <cstdint>
 #include <outputStream.h>
 
 
-namespace MaxOS::net {
+namespace NetServer::protocol::network {
 
 
 	/**
@@ -53,4 +53,4 @@ namespace MaxOS::net {
 }
 
 
-#endif //MAXOS_NET_ICMP_H
+#endif //NETSERVER_PROTOCOL_NETWORK_ICMP_H
