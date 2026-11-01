@@ -12,7 +12,6 @@
 #include <cstdint>
 #include <protocol/network/ipv4.h>
 
-
 namespace NetServer::protocol::link {
 
 	/**
