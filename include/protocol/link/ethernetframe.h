@@ -35,8 +35,8 @@ namespace NetServer::protocol::link {
 		friend class EthernetFrameProtocol;
 
 		protected:
-			EthernetFrameProtocol* protocol_provider;                       ///< The backend that provides this protocol
-			LibNet::protocol::link::ethernet_frame_type_t handled_type;     ///< The type of frame this handler expects
+			EthernetFrameProtocol* m_protocol_provider;                       ///< The backend that provides this protocol
+			LibNet::protocol::link::ethernet_frame_type_t m_handled_type;     ///< The type of frame this handler expects
 
 		public:
 			EthernetFramePacketHandler(EthernetFrameProtocol* protocol_provider, LibNet::protocol::link::ethernet_frame_type_t handled_type);
@@ -58,18 +58,14 @@ namespace NetServer::protocol::link {
 
 			MaxOS::common::Map<LibNet::protocol::link::ethernet_frame_type_t, EthernetFramePacketHandler*> m_frame_handlers;  ///< The map of frame handlers by type
 
-	        LibNet::address::mac_t m_mac;
-
 		public:
-			EthernetFrameProtocol(LibNet::address::mac_t mac);
+			EthernetFrameProtocol(interface::Interface* interface);
 			~EthernetFrameProtocol();
 
-			LibNet::address::mac_t get_mac();
+	        void handle_packet(MaxOS::common::byte_span_t data) final;
 
             void send_ethernet_frame(LibNet::address::mac_t destination, LibNet::protocol::link::ethernet_frame_type_t frame_type, uint8_t* data, uint32_t size);
 	        bool recv_ethernet_frame(uint8_t* data, uint32_t size);
-
-	        void receive(MaxOS::common::byte_span_t data) final;
 
             void add_handler(EthernetFramePacketHandler* handler);
             void remove_handler(EthernetFramePacketHandler* handler);

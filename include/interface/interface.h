@@ -7,6 +7,8 @@
 
 #include <libcommon/vector.h>
 #include <libcommon/byte_span.h>
+#include <libnet/address/mac.h>
+#include <libnet/address/ipv4.h>
 
 namespace NetServer::interface {
 
@@ -14,15 +16,15 @@ namespace NetServer::interface {
 
     class InterfaceBinding {
 
-        private:
-            Interface* m_interface_backend;
+        protected:
+            Interface* m_interface;
 
         public:
-            InterfaceBinding();
+            InterfaceBinding(Interface* interface);
             ~InterfaceBinding();
 
 
-            virtual void receive(MaxOS::common::byte_span_t data);
+            virtual void handle_packet(MaxOS::common::byte_span_t data);
             void send(MaxOS::common::byte_span_t data);
     };
 
@@ -30,6 +32,10 @@ namespace NetServer::interface {
 
         private:
             MaxOS::common::Vector<InterfaceBinding*> m_binding;
+
+            LibNet::address::mac_t m_mac_address;
+            LibNet::address::ipv4_address_t m_ipv4_address;
+            LibNet::address::Subnet m_subnet_mask;
 
         public:
             Interface();
@@ -40,6 +46,11 @@ namespace NetServer::interface {
 
             void receive(MaxOS::common::byte_span_t data);
             virtual void send(MaxOS::common::byte_span_t data);
+
+            LibNet::address::mac_t get_mac() const;
+            LibNet::address::ipv4_address_t get_ipv4_address() const;
+
+            void set_ipv4_address(LibNet::address::ipv4_address_t address);
     };
 
 };

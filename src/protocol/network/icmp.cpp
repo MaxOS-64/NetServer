@@ -6,11 +6,19 @@
  * @author Max Tyson
  */
 
-#include <net/icmp.h>
+#include <protocol/network/icmp.h>
+
 
 using namespace  MaxOS;
 using namespace  MaxOS::common;
-using namespace  MaxOS::net;
+using namespace  MaxOS::KPI;
+using namespace  LibNet;
+using namespace  LibNet::protocol;
+using namespace  LibNet::protocol::network;
+using namespace  LibNet::address;
+using namespace  NetServer;
+using namespace  NetServer::protocol;
+using namespace  NetServer::protocol::network;
 
 /**
  * @brief Constructs an InternetControlMessageProtocol handler.
@@ -18,20 +26,18 @@ using namespace  MaxOS::net;
  * @param internet_protocol_handler The Internet protocol handler to use.
  * @param error_messages The output stream to use for error messages.
  */
-InternetControlMessageProtocol::InternetControlMessageProtocol(InternetProtocolHandler *internet_protocol_handler, OutputStream* error_messages)
-: IPV4PayloadHandler(internet_protocol_handler, 0x01)
+InternetControlMessageProtocol::InternetControlMessageProtocol(InternetProtocolVersion4* protocol_provider)
+: IPV4PacketHandler(protocol_provider, ICMP)
 {
-    this -> error_messages = error_messages;
 }
 
-
-
 InternetControlMessageProtocol::~InternetControlMessageProtocol() = default;
+
 /**
  * @brief Called by the InternetProtocolProvider when a new packet has arrived
  *
- * @param src_ip_be  The source IP address of the packet
- * @param dst_ip_be  The destination IP address of the packet
+ * @param source  The source IP address of the packet
+ * @param destination  The destination IP address of the packet
  * @param payload_data  The payload of the packet
  * @param size The size of the payload
 
@@ -40,40 +46,34 @@ InternetControlMessageProtocol::~InternetControlMessageProtocol() = default;
  * @todo Reply to ping requests
  * @todo Implement the rest of the ICMP messages
  */
-bool InternetControlMessageProtocol::handle_internet_protocol_payload(net::InternetProtocolAddress src_ip_be,
-                                                                      net::InternetProtocolAddress dst_ip_be,
-                                                                      uint8_t *payload_data,
-                                                                      uint32_t size)
+bool InternetControlMessageProtocol::handle_packet(ipv4_address_t source, ipv4_address_t destination, uint8_t *payload_data, uint32_t size)
 {
 
-    error_messages -> write("ICMP received a packet\n");
+    klog("ICMP received a packet\n");
 
-    // Check if the size is at least the size of the header
-    if(size < sizeof(ICMPHeader)){
+    // Cannot be a icmp packet
+    if(size < sizeof(icmp_header_t))
         return false;
-    }
 
-    // Cast the payload to the ICMP header
-    auto* icmp = (ICMPHeader*)payload_data;
+    auto* icmp = (icmp_header_t*)payload_data;
 
-    switch (icmp -> type) {
+    switch ((ICMPType)icmp->type) {
 
-        case 0: // Echo reply
+        case ICMPType::ECHO_REPLY:
             break;
 
-        case 8: // Echo request
+        case ICMPType::ECHO_REQUEST:
 
             // Create a response
-            icmp -> type = 0;                                                                                                                    // Echo reply
-            icmp -> checksum = 0;                                                                                                                // Reset the checksum
-            icmp -> checksum = InternetProtocolHandler::checksum((uint16_t*) &icmp, sizeof(ICMPHeader));             // Calculate the checksum
+            icmp -> type = (uint8_t)ICMPType::ECHO_REPLY;
+            icmp -> checksum = 0;
+            icmp -> checksum = InternetProtocolVersion4::checksum((uint16_t*) &icmp, sizeof(icmp_header_t));
 
-            return true;    //Send data back
-
+            // Send data back
+            return true;
     }
 
     return false;
-
 }
 
 /**
@@ -83,17 +83,15 @@ bool InternetControlMessageProtocol::handle_internet_protocol_payload(net::Inter
  */
 void InternetControlMessageProtocol::request_echo_reply(uint32_t ip_be) {
 
-    error_messages -> write("ICMP: Sending echo request\n");
+    klog("ICMP: Sending echo request\n");
 
-    ICMPHeader icmp = {};
-    icmp.type = 8;                      // Echo request
-    icmp.code = 0;                      // Code must be 0
-    icmp.checksum = 0;                  // Checksum must be 0 to calculate it
-    icmp.data = 0x69420;        // Data
+    icmp_header_t icmp = {};
+    icmp.type = (uint8_t)ICMPType::ECHO_REQUEST;
+    icmp.code = 0;
+    icmp.checksum = 0;
+    icmp.data = 0x69420;
+    icmp.checksum = InternetProtocolVersion4::checksum((uint16_t*)&icmp, sizeof(icmp_header_t));
 
-    icmp.checksum = InternetProtocolHandler::checksum((uint16_t*) &icmp, sizeof(ICMPHeader));
-
-	send(ip_be, (uint8_t*) &icmp, sizeof(ICMPHeader));
-
-    error_messages -> write("ICMP: Echo request sent\n");
+	send(ip_be, (uint8_t*) &icmp, sizeof(icmp_header_t));
+    klog("ICMP: Echo request sent\n");
 }

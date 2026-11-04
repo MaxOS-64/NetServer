@@ -12,6 +12,7 @@ using namespace MaxOS;
 using namespace MaxOS::common;
 using namespace MaxOS::KPI;
 using namespace NetServer;
+using namespace NetServer::interface;
 using namespace NetServer::protocol;
 using namespace NetServer::protocol::link;
 using namespace LibNet;
@@ -29,18 +30,18 @@ using namespace LibDriver::generic;
  */
 EthernetFramePacketHandler::EthernetFramePacketHandler(EthernetFrameProtocol* protocol_provider, ethernet_frame_type_t handled_type) {
 
-	this->handled_type = handled_type;
-	this->protocol_provider = protocol_provider;
+    this->m_protocol_provider = protocol_provider;
+    this->m_handled_type = handled_type;
 
     // Register as a packet handler
-	protocol_provider->add_handler(this);
+	m_protocol_provider->add_handler(this);
 }
 
 /**
  * @brief Destroy the EtherFrameHandler:: EtherFrameHandler object, Removes it from the handler list
  */
 EthernetFramePacketHandler::~EthernetFramePacketHandler(){
-    protocol_provider->remove_handler(this);
+    m_protocol_provider->remove_handler(this);
 };
 
 /**
@@ -52,7 +53,7 @@ EthernetFramePacketHandler::~EthernetFramePacketHandler(){
  */
 void EthernetFramePacketHandler::send(const mac_t& destination, uint8_t* data, uint32_t size) const {
 
-    protocol_provider->send_ethernet_frame(destination, handled_type, data, size);
+    m_protocol_provider->send_ethernet_frame(destination, m_handled_type, data, size);
 }
 
 /**
@@ -70,29 +71,19 @@ bool EthernetFramePacketHandler::handle_packet(uint8_t* ethernetframe_payload, u
 }
 
 ethernet_frame_type_t EthernetFramePacketHandler::type() {
-    return handled_type;
+    return m_handled_type;
 }
 
 /**
  * @brief Construct a new Ether Frame Handler object
  */
-EthernetFrameProtocol::EthernetFrameProtocol(mac_t address)
-: m_mac(address)
+EthernetFrameProtocol::EthernetFrameProtocol(Interface* interface)
+: InterfaceBinding(interface)
 {
 
 };
 
 EthernetFrameProtocol::~EthernetFrameProtocol() = default;
-
-/**
- * @brief Get the MAC address of this device
- *
- * @return MediaAccessControlAddress The MAC address
- */
-mac_t EthernetFrameProtocol::get_mac() {
-	return m_mac;
-}
-
 
 /**
  * @brief Send a ethernet frame payload
@@ -110,9 +101,9 @@ void EthernetFrameProtocol::send_ethernet_frame(mac_t destination_mac, ethernet_
     auto* frame = (ethernet_frame_header_t*) buffer;
 
     // Set the metadata
-    frame->destination_mac  = destination_mac.address();
-    frame->source_mac       = m_mac.address();
-    frame->type             = host_to_network(frame_type);
+    frame->destination_mac  = destination_mac.raw_address();
+    frame->source_mac       = m_interface->get_mac().raw_address();
+    frame->type             = host_to_network((uint16_t)frame_type);
 
     // Copy the payload
     for(uint8_t* src = data + size - 1, * dst = buffer + sizeof(ethernet_frame_header_t) + size - 1; src >= data; --src, --dst)
@@ -148,7 +139,7 @@ bool EthernetFrameProtocol::recv_ethernet_frame(uint8_t* buffer, uint32_t size) 
 	bool send_back = false;
 
 	//Only handle if it is for this device
-	if(frame->destination_mac == BROADCAST_MAC || frame->destination_mac == m_mac.address())
+	if(frame->destination_mac == BROADCAST_MAC || frame->destination_mac == m_interface->get_mac().raw_address())
 	{
 
 		// Find the handler for the protocol
@@ -170,17 +161,17 @@ bool EthernetFrameProtocol::recv_ethernet_frame(uint8_t* buffer, uint32_t size) 
 
 	    // Update the packt to be directed back to the sender
 		frame->destination_mac = frame->source_mac;
-		frame->source_mac = m_mac.address();
+		frame->source_mac = m_interface->get_mac().raw_address();
 
 	}
 
 	return send_back;
 }
 
-void EthernetFrameProtocol::receive(byte_span_t data) {
+void EthernetFrameProtocol::handle_packet(byte_span_t data) {
 
     // Delegate to handler
-    bool send_back = recv_ethernet_frame((uint8_t*)data.data, data.size);
+    bool send_back = recv_ethernet_frame(data.data, data.size);
     if (send_back)
         send(data);
 

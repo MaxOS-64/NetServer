@@ -10,79 +10,85 @@
 
 using namespace MaxOS;
 using namespace MaxOS::common;
-using namespace MaxOS::net;
-using namespace MaxOS::drivers;
-using namespace MaxOS::drivers::ethernet;
+using namespace MaxOS::KPI;
+using namespace LibNet;
+using namespace LibNet::address;
+using namespace LibNet::protocol;
+using namespace LibNet::protocol::link;
+using namespace NetServer;
+using namespace NetServer::interface;
+using namespace NetServer::protocol;
+using namespace NetServer::protocol::link;
 
 
 /**
  * @brief Constructs an AddressResolutionProtocol handler.
  *
- * @param ethernet_frame_handler The Ethernet frame handler to use.
- * @param internet_protocol_handler The Internet protocol handler to use.
- * @param error_messages The output stream to use for error messages.
+ * @param protocol_provider The ethernet frame protocol implmentation
  */
-net::AddressResolutionProtocol::AddressResolutionProtocol(EthernetFrameHandler* ethernet_frame_handler, InternetProtocolHandler* internet_protocol_handler, OutputStream* error_messages)
-		: EthernetFramePayloadHandler(ethernet_frame_handler, 0x0806),
-		IPV4AddressResolver(internet_protocol_handler) {
-	this->internet_protocol_handler = internet_protocol_handler;
-	this->error_messages = error_messages;
+AddressResolutionProtocol::AddressResolutionProtocol(Interface* interface, EthernetFrameProtocol* protocol_provider)
+: EthernetFramePacketHandler(protocol_provider, EthernetFrameType::ARP),
+  m_interface(interface)
+{
 }
 
-net::AddressResolutionProtocol::~AddressResolutionProtocol() = default;
+AddressResolutionProtocol::~AddressResolutionProtocol() = default;
 
 /**
  * @brief Called when an ARP packet is received.
  *
- * @param ethernetframePayload The payload of the ARP packet.
+ * @param ethernetframe_payload The payload of the ARP packet.
  * @param size The size of the ARP packet.
  * @return True if the device should send a response, false otherwise.
  */
-bool AddressResolutionProtocol::handle_ethernetframe_payload(uint8_t* ethernetframePayload, uint32_t size) {
+bool AddressResolutionProtocol::handle_packet(uint8_t* ethernetframe_payload, uint32_t size) {
 
-	//Check if the size is correct
-	if (size < sizeof(ARPMessage))
+	// Cant  be an ARP packet
+	if (size < sizeof(arp_message_t))
 		return false;
 
-	//Convert the payload to an ARP message
-	auto* arp_message = (ARPMessage*) ethernetframePayload;
+	auto* arp_message = (arp_message_t*)ethernetframe_payload;
 
-	//Check if the message hardware type is Ethernet (BigEndian)
-	if (arp_message->hardware_type == 0x100) {
+    // Not for ethernet (@todo support others)
+    if (arp_message->hardware_type != host_to_network((uint16_t)HardwareType::ETHERNET))
+        return false;
 
-		if (arp_message->protocol == 0x0008             //Check if the protocol is IPv4 (BigEndian)
-		    && arp_message->hardware_address_size == 6
-		    && arp_message->protocol_address_size == 4
-		    && arp_message->dst_ip == internet_protocol_handler->get_internet_protocol_address()) {
+    // Not for IPv4 (@todo support others)
+    if (arp_message->hardware_type != host_to_network((uint16_t)ProtocolType::IPV4))
+        return false;
 
-			switch (arp_message->command) {
-				//Request
-				case 0x0100:
-					arp_message->command = 0x0200;                                                                         //Set the command to reply
-					arp_message->dst_mac = arp_message->src_mac;                                                            //Set the destination MAC to the source MAC
-					arp_message->dst_ip = arp_message->src_ip;                                                              //Set the destination IP to the source IP
-					arp_message->src_mac = internet_protocol_handler->get_media_access_control_address();                      //Set the source MAC to this MAC
-					arp_message->src_ip = internet_protocol_handler->get_internet_protocol_address();                         //Set the source IP to this IP
-					return true;
+    // Address is in a unkown format
+    if (arp_message->hardware_address_size != MAC_ADDRESS_BYTES || arp_message->protocol_address_size != IP_ADDRESS_BYTES)
+        return false;
 
-					//Response
-				case 0x0200:
-					address_cache.insert((InternetProtocolAddress) arp_message->src_ip,
-					                     (MediaAccessControlAddress) arp_message->src_mac);     //Insert the MAC address into the cache
-					break;
+    // Not for this device
+    if (arp_message->dest_ip != host_to_network(m_interface->get_ipv4_address().raw_address()))
+        return false;
 
-				default:
-					break;
+    switch ((arp_command_t)network_to_host(arp_message->command)) {
 
-			}
+        case ARPCommand::REQUEST:
+				arp_message->command = host_to_network((uint16_t)ARPCommand::REPLY);
 
-		}
+                // Update addressing to be from this device
+				arp_message->dest_mac = arp_message->src_mac;
+				arp_message->dest_ip = arp_message->src_ip;
+				arp_message->src_mac = host_to_network(m_interface->get_mac().raw_address());
+				arp_message->src_ip = host_to_network(m_interface->get_ipv4_address().raw_address());
+				return true;
+
+		case ARPCommand::REPLY:
+            store(network_to_host(arp_message->src_ip), network_to_host(arp_message->src_mac));
+			break;
+
+		default:
+            klog("Unkown ARP request type 0x%x\n", network_to_host(arp_message->command));
+			break;
 
 	}
 
-	//By default, don't send anything back
+    // By default, don't send anything back
 	return false;
-
 
 }
 
@@ -92,66 +98,24 @@ bool AddressResolutionProtocol::handle_ethernetframe_payload(uint8_t* ethernetfr
  *
  * @param address The IP address in BigEndian.
  */
-void AddressResolutionProtocol::request_mac_address(InternetProtocolAddress address) {
+void AddressResolutionProtocol::query_address(ipv4_address_t address) {
 
-	//When a MAC address is requested, instantiate a new ARP message block on the stack
-	ARPMessage arp_message = { };
+	arp_message_t arp_message = { };
 
-	//Set the message's values
-	arp_message.hardware_type = 0x0100;                                                   //Ethernet, encoded in BigEndian
-	arp_message.protocol = 0x0008;                                                       //IPv4, encoded in BigEndian
-	arp_message.hardware_address_size = 6;                                                 //MAC address size
-	arp_message.protocol_address_size = 4;                                                 //IPv4 address size
-	arp_message.command = 0x0100;                                                        //Request, encoded in BigEndian
+	// Set the message metadat
+	arp_message.hardware_type = host_to_network((uint16_t)HardwareType::ETHERNET);
+	arp_message.protocol = host_to_network((uint16_t)ProtocolType::IPV4);
+	arp_message.hardware_address_size = MAC_ADDRESS_BYTES;
+	arp_message.protocol_address_size = IP_ADDRESS_BYTES;
+	arp_message.command = host_to_network((uint16_t)ARPCommand::REQUEST);
 
-	//Set the message's source and destination
-	arp_message.src_mac = frame_handler->get_mac();                                       //Set the source MAC address to the backend's MAC address
-	arp_message.src_ip = internet_protocol_handler->get_internet_protocol_address();        //Set the source IP address to the backend's IP address
-	arp_message.dst_mac = 0xFFFFFFFFFFFF;                                                 //Set the destination MAC address to broadcast
-	arp_message.dst_ip = address;                                                           //Set the destination IP address to the requested IP address
+	// Broadcast the address being looked up
+    arp_message.src_mac = host_to_network(m_interface->get_mac().raw_address());
+    arp_message.src_ip = host_to_network(m_interface->get_ipv4_address().raw_address());
+    arp_message.dest_mac = BROADCAST_MAC;
+	arp_message.dest_ip = host_to_network(address.raw_address());
 
 	//Send the message
-	this->send(arp_message.dst_mac, (uint8_t*) &arp_message, sizeof(ARPMessage));
-
-
+	this->send(arp_message.dest_mac, (uint8_t*)&arp_message, sizeof(arp_message_t));
 }
 
-
-/**
- * @brief Get the MAC address from an IP via ARP.
- *
- * @param address The IP address to get the MAC address from.
- * @return The MAC address of the IP address.
- *
- * @todo Should have a timeout in case the address cannot be resolved and avoid infinite loops
- */
-MediaAccessControlAddress AddressResolutionProtocol::resolve(InternetProtocolAddress address) {
-
-	volatile Map<InternetProtocolAddress, MediaAccessControlAddress>::iterator cache_iterator = address_cache.find(
-			address); //Check if the MAC address is in the cache
-
-	//If not, request it
-	if (address_cache.end() == cache_iterator) {
-		request_mac_address(address);
-	}
-
-	//This isn't safe because the MAC address might not be in the cache yet or the machine may not be connected to the network (possible infinite loop) //TODO: TIMEOUT
-	while (cache_iterator == address_cache.end()) {                         //Wait until the MAC address is found
-		cache_iterator = address_cache.find(address);
-	}
-
-	//Return the MAC address
-
-	return cache_iterator->second;
-
-}
-
-/**
- * @brief store a mapping of an IP address to a MAC address.
- *
- * @param internet_protocol_address The IP address.
- * @param media_access_control_address The MAC address.
- */
-void AddressResolutionProtocol::store(InternetProtocolAddress internet_protocol_address, drivers::ethernet::MediaAccessControlAddress media_access_control_address) {
-	address_cache.insert(internet_protocol_address, media_access_control_address);
-}

@@ -9,47 +9,30 @@
 #ifndef NETSERVER_PROTOCOL_NETWORK_ICMP_H
 #define NETSERVER_PROTOCOL_NETWORK_ICMP_H
 
-#include <net/ipv4.h>
 #include <cstdint>
-#include <outputStream.h>
-
+#include <libnet/protocol/network/icmp.h>
+#include <protocol/network/ipv4.h>
 
 namespace NetServer::protocol::network {
-
-
-	/**
-	 * @struct ICMPHeader
-	 * @brief The header of an ICMP packet
-	 *
-	 * @typedef icmp_header_t
-	 * @brief Alias for ICMPHeader struct
-	 */
-	typedef struct PACKED ICMPHeader {
-
-		uint8_t type;           ///< The type of ICMP message
-		uint8_t code;           ///< The code of the ICMP message
-
-		uint16_t checksum;      ///< checksum to verify integrity
-		uint32_t data;          ///< Payload data (Varies by type and code)
-
-	} icmp_header_t;
 
 	/**
 	 * @class InternetControlMessageProtocol
 	 * @brief Handles ICMP packets
 	 */
-	class InternetControlMessageProtocol : IPV4PayloadHandler {
+	class InternetControlMessageProtocol : IPV4PacketHandler {
 
-			common::OutputStream* error_messages;
+	    private:
+			void request_echo_reply(uint32_t ip_be);
 
-		public:
-			InternetControlMessageProtocol(InternetProtocolHandler* internet_protocol_handler, common::OutputStream* error_messages);
+	    public:
+			InternetControlMessageProtocol(InternetProtocolVersion4* protocol_provider);
 			~InternetControlMessageProtocol();
 
-			bool handle_internet_protocol_payload(net::InternetProtocolAddress src_ip_be, net::InternetProtocolAddress dst_ip_be, uint8_t* payload_data, uint32_t size) final;
-			void request_echo_reply(uint32_t ip_be);
-	};
+			bool handle_packet(LibNet::address::ipv4_address_t source, LibNet::address::ipv4_address_t destination, uint8_t* internetprotocol_payload, uint32_t size) final;
 
+	        void send_icmp_packet(uint32_t dst_ip_be, uint8_t protocol, const uint8_t* data, uint32_t size);
+	        bool recv_icmp_packet(uint8_t* data, uint32_t size);
+	};
 }
 
 

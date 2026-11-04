@@ -10,226 +10,110 @@
 #define NETSERVER_PROTOCOL_TRANSPORT_TCP_H
 
 #include <cstdint>
-#include <net/ipv4.h>
-#include <memory/memorymanagement.h>
-#include <mem.h>
-
+#include <protocol/network/ipv4.h>
+#include <libnet/protocol/transport/tcp.h>
+#include <libcommon/mem.h>
+#include <libcommon/bits.h>
+#include <libnet/address/port.h>
 
 namespace NetServer::protocol::transport {
 
-	typedef uint16_t TransmissionControlProtocolPort;   ///< TCP port @todo: Make TCPPort class and do tcp_port_t
-
-	/**
-	 * @enum TCPSocketState
-	 * @brief The state of a TCP socket
-	 */
-	enum class TCPSocketState {
-		CLOSED,
-		LISTEN,
-		SYN_SENT,
-		SYN_RECEIVED,
-
-		ESTABLISHED,
-
-		FIN_WAIT1,
-		FIN_WAIT2,
-		CLOSING,
-		TIME_WAIT,
-
-		CLOSE_WAIT,
-		LAST_ACK
-	};
-
-	/**
-	 * @enum TCPFlag
-	 * @brief The flags in a TCP header
-	 */
-	enum class TCPFlag {
-		FIN = 1,
-		SYN = 2,
-		RST = 4,
-		PSH = 8,
-		ACK = 16,
-		URG = 32,
-		ECE = 64,
-		CWR = 128,
-		NS = 256
-	};
-
-	/**
-	 * @struct TCPHeader
-	 * @brief The header of a TCP packet
-	 *
-	 * @typedef tcp_header_t
-	 * @brief Alias for TCPHeader struct
-	 */
-	typedef struct PACKED TCPHeader {
-
-		uint16_t src_port;                   ///< The port of the sender
-		uint16_t dst_port;                   ///< The port of the receiver
-		uint32_t sequence_number;            ///< Where this packet's data fits in the overall order of the data stream
-		uint32_t acknowledgement_number;     ///< The next expected sequence number from the sender (used by the receiver to request the next data)
-
-		uint8_t reserved : 4;                ///< Unused, must be 0
-		uint8_t header_size_32 : 4;            ///< The size of the header in 32-bit words
-		uint8_t flags;                      ///< The flags of the TCP packet (see TCPFlag enum)
-
-		uint16_t window_size;                ///< How many bytes the sender is willing to receive
-		uint16_t checksum;                  ///< The checksum of the header
-		uint16_t urgent_ptr;                 ///< Where in the data the urgent data *ends* (if the URG flag is set)
-
-		uint32_t options;                   ///< The options for the TCP packet (MSS, Window Scale, SACK Permitted) @todo: make this a struct
-
-	} tcp_header_t;
-
-	/**
-	 * @struct TCPPseudoHeader
-	 * @brief The pseudo header used for TCP checksum calculation
-	 *
-	 * @details The pseudo header is used to calculate the checksum of the TCP header. It is a copy of the IP
-	 * header, but with the protocol field set to 6 (TCP) and the length field set to the length of the TCP header.
-	 *
-	 * @typedef tcp_pseudo_header_t
-	 * @brief Alias for TCPPseudoHeader struct
-	 */
-	typedef struct PACKED TCPPseudoHeader {
-
-		uint32_t src_ip;         ///< The IP address of the sender
-		uint32_t dst_ip;         ///< The IP address of the receiver
-		uint16_t protocol;      ///< The protocol (set to 6 for TCP)
-		uint16_t total_length;   ///< The total length of the TCP header and data
-
-	} tcp_pseudo_header_t;
-
 
 	// Forward declarations
+	class TransmissionControlProtocol;
 	class TCPSocket;
 
-	class TransmissionControlProtocolHandler;
+    /**
+     * @class TCPPayloadHandler
+     * @brief Handler for TCP payloads
+     */
+    class TCPPacketHandler {
+    public:
+        TCPPacketHandler();
+        ~TCPPacketHandler();
 
-	/**
-	 * @enum TCPPayloadHandlerEvents
-	 * @brief Events for the TCPPayloadHandler
-	 */
-	enum class TCPPayloadHandlerEvents {
-		CONNECTED,
-		DISCONNECTED,
-		DATA_RECEIVED
-	};
+        virtual void handle_packet(TCPSocket* socket, uint8_t* data, uint16_t size);
+        virtual void on_connected(TCPSocket* socket);
+        virtual void on_disconnected(TCPSocket* socket);
+    };
 
-	/**
-	 * @class DataReceivedEvent
-	 * @brief Event for when data is received on a TCP socket
-	 */
-	class DataReceivedEvent : public common::Event<TCPPayloadHandlerEvents> {
-		public:
-			TCPSocket* socket;       ///< The socket that received the data
-			uint8_t* data;                                   ///< The data received
-			uint16_t size;                                    ///< The size of the data received
-			DataReceivedEvent(TCPSocket* socket, uint8_t* data, uint16_t size);
-			~DataReceivedEvent();
-	};
+    /**
+     * @class TCPSocket
+     * @brief A TCP socket. Allows for sending and receiving data over TCP at a port
+     */
+    class TCPSocket {
+        friend class TransmissionControlProtocol;
 
-	/**
-	 * @class ConnectedEvent
-	 * @brief Event for when a TCP socket is connected
-	 */
-	class ConnectedEvent : public common::Event<TCPPayloadHandlerEvents> {
-		public:
-			TCPSocket* socket;                      ///< The socket that is connected
-			explicit ConnectedEvent(TCPSocket* socket);
-			~ConnectedEvent();
-	};
+        private:
 
-	/**
-	 * @class DisconnectedEvent
-	 * @brief Event for when a TCP socket is disconnected
-	 */
-	class DisconnectedEvent : public common::Event<TCPPayloadHandlerEvents> {
-		public:
-			TCPSocket* socket;                      ///< The socket that is disconnected
-			explicit DisconnectedEvent(TCPSocket* socket);
-			~DisconnectedEvent();
-	};
+            TransmissionControlProtocol* m_protocol_provider;  ///< The TCP handler this socket is using
+            LibNet::protocol::transport::TCPSocketState state;                                                    ///< The state of the socket
 
-	/**
-	 * @class TCPPayloadHandler
-	 * @brief Handler for TCP payloads
-	 */
-	class TCPPayloadHandler : public common::EventHandler<TCPPayloadHandlerEvents> {
-		public:
-			TCPPayloadHandler();
-			~TCPPayloadHandler();
+            MaxOS::common::Vector<TCPPacketHandler*> m_packet_handlers;
 
-			common::Event<TCPPayloadHandlerEvents>* on_event(common::Event<TCPPayloadHandlerEvents>* event) override;
 
-			virtual void handle_transmission_control_protocol_payload(TCPSocket* socket, uint8_t* data, uint16_t size);
-			virtual void connected(TCPSocket* socket);
-			virtual void disconnected(TCPSocket* socket);
-	};
+        protected:
+            LibNet::address::ipv4_address_t local_ip  = 0;                       ///< The IP address of this device
+            LibNet::address::ipv4_address_t remote_ip = 0;                      ///< The IP address of the external device
+            LibNet::address::port_t local_port  = 0;                     ///< The port on this device
+            LibNet::address::port_t remote_port = 0;                    ///< The port on the external device
 
-	/**
-	 * @class TCPSocket
-	 * @brief A TCP socket. Allows for sending and receiving data over TCP at a port
-	 */
-	class TCPSocket : public common::EventManager<TCPPayloadHandlerEvents> {
-			friend class TransmissionControlProtocolHandler;
+            uint32_t sequence_number = 0;                ///< The current order number of the data being sent
+            uint32_t acknowledgement_number = 0;         ///< The number used to keep track of what has been received, incremented by 1 each time
 
-			friend class TransmissionControlProtocolPortListener;
+        public:
+            explicit TCPSocket(TransmissionControlProtocol* protocol_provider);
+            ~TCPSocket();
 
-		protected:
-			uint16_t remotePort = 0;                    ///< The port on the external device
-			uint32_t remote_ip = 0;                      ///< The IP address of the external device
-			uint16_t local_port = 0;                     ///< The port on this device
-			uint32_t local_ip = 0;                       ///< The IP address of this device
-			uint32_t sequence_number = 0;                ///< The current order number of the data being sent
-			uint32_t acknowledgement_number = 0;         ///< The number used to keep track of what has been received, incremented by 1 each time
+            void send(uint8_t* data, uint16_t size);
+            void close();
 
-			TransmissionControlProtocolHandler* transmission_control_protocol_handler;  ///< The TCP handler this socket is using
-			TCPSocketState state;                                                    ///< The state of the socket
-		public:
-			explicit TCPSocket(TransmissionControlProtocolHandler* transmission_control_protocol_handler);
-			~TCPSocket();
+            void on_connected();
+            void on_disconnect();
 
-			virtual void send(uint8_t* data, uint16_t size);
-			virtual void disconnect();
+            void add_handler(TCPPacketHandler* handler);
+            void remove_handler(TCPPacketHandler* handler);
 
-			void disconnected();
-			void connected();
+            bool handle_tcp_payload(uint8_t* data, size_t size);
+    };
 
-			bool handle_transmission_control_protocol_payload(uint8_t* data, uint16_t size);
-	};
 
-	/**
-	 * @class TransmissionControlProtocolHandler
+
+    /**
+	 * @class TransmissionControlProtocol
 	 * @brief Handles TCP packets and manages TCP sockets
 	 */
-	class TransmissionControlProtocolHandler : IPV4PayloadHandler {
-			friend class TCPSocket;
+    class TransmissionControlProtocol : network::IPV4PacketHandler {
+        friend class TCPSocket;
 
-		protected:
-			common::OutputStream* error_messages;                                ///< Where to write error messages
-			common::Vector<TCPSocket*> sockets;         ///< The list of connected sockets
+        private:
+            MaxOS::common::Vector<TCPSocket*> m_connected_sockets;         ///< The list of connected sockets
+            inline static uint16_t m_free_port = 0x8000;                    ///< The next free port to use for new sockets (@todo this needs to be somewhere else)
+            interface::Interface* m_interface = nullptr;
 
-			static TransmissionControlProtocolPort free_ports;                   ///< The next free port to use for new sockets
-			void send_transmission_control_protocol_packet(TCPSocket* socket, const uint8_t* data, uint16_t size, uint16_t flags = 0);
+            void handle_reset(TCPSocket* socket);
+            void send_reset(TCPSocket* socket, LibNet::protocol::transport::tcp_header_t* message, LibNet::address::ipv4_address_t source_ip, LibNet::address::ipv4_address_t destination_ip);
+            void handle_syn(TCPSocket* socket, LibNet::protocol::transport::tcp_header_t* message, LibNet::address::ipv4_address_t source_ip);
+            void handle_syn_ack(TCPSocket* socket, LibNet::protocol::transport::tcp_header_t* message);
+            void handle_established(TCPSocket* socket);
+            void handle_connected_socket(TCPSocket* socket, LibNet::protocol::transport::tcp_header_t* message, uint8_t* internetprotocol_payload, uint32_t size, bool ack, bool fin);
+            bool handle_ack(TCPSocket* socket, LibNet::protocol::transport::tcp_header_t* message);
+            bool handle_payload(TCPSocket* socket, LibNet::protocol::transport::tcp_header_t* message, uint8_t* internetprotocol_payload, uint32_t size);
+            bool handle_fin(TCPSocket* socket, LibNet::protocol::transport::tcp_header_t* message, uint32_t size);
 
-		public:
-			TransmissionControlProtocolHandler(InternetProtocolHandler* internet_protocol_handler, common::OutputStream* error_messages);
-			~TransmissionControlProtocolHandler();
+        public:
+            TransmissionControlProtocol(interface::Interface* interface, network::InternetProtocolVersion4* protocol_provider);
+            ~TransmissionControlProtocol();
 
-			bool handle_internet_protocol_payload(net::InternetProtocolAddress source_ip, net::InternetProtocolAddress destination_ip, uint8_t* payload_data, uint32_t size) override;
+            bool handle_packet(LibNet::address::ipv4_address_t source_ip, LibNet::address::ipv4_address_t destination_ip, uint8_t* internetprotocol_payload, uint32_t size) override;
 
-			TCPSocket* connect(InternetProtocolAddress ip, TransmissionControlProtocolPort port);
-			static TCPSocket* connect(const string& address);
+            void send_tcp_packet(TCPSocket* socket, const uint8_t* data, uint16_t size, uint16_t flags = 0);
+            bool recv_tcp_packet(LibNet::address::ipv4_address_t source, LibNet::address::ipv4_address_t destination, uint8_t* internetprotocol_payload, uint32_t size) override;
 
-			void disconnect(TCPSocket* socket);
-
-			virtual TCPSocket* listen(uint16_t port);
-			virtual void bind(TCPSocket* socket, TCPPayloadHandler* handler);
-	};
-
-
+            TCPSocket* connect(const MaxOS::string& address);
+            TCPSocket* connect(LibNet::address::ipv4_address_t ip, LibNet::address::port_t port);
+            TCPSocket* listen(LibNet::address::port_t port);
+    };
 }
 
 
