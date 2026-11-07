@@ -7,6 +7,8 @@
 
 #include <libcommon/vector.h>
 #include <libcommon/byte_span.h>
+#include <libcommon/macros.h>
+#include <libcommon/assert.h>
 #include <libnet/address/mac.h>
 #include <libnet/address/ipv4.h>
 
@@ -33,9 +35,14 @@ namespace NetServer::interface {
         private:
             MaxOS::common::Vector<InterfaceBinding*> m_binding;
 
-            LibNet::address::mac_t m_mac_address;
-            LibNet::address::ipv4_address_t m_ipv4_address;
-            LibNet::address::Subnet m_subnet_mask;
+            LibNet::address::mac_t m_mac_address = 0;
+            LibNet::address::ipv4_address_t m_ipv4_address = 0;
+            LibNet::address::Subnet m_subnet_mask = {0,0};
+
+        protected:
+            void set_ipv4_address(LibNet::address::ipv4_address_t address);
+            void set_mac_address(LibNet::address::mac_t mac);
+
 
         public:
             Interface();
@@ -50,7 +57,6 @@ namespace NetServer::interface {
             LibNet::address::mac_t get_mac() const;
             LibNet::address::ipv4_address_t get_ipv4_address() const;
 
-            void set_ipv4_address(LibNet::address::ipv4_address_t address);
     };
 
 };

@@ -91,7 +91,7 @@ namespace NetServer::protocol::transport {
             bool handle_packet(LibNet::address::ipv4_address_t source, LibNet::address::ipv4_address_t destination, uint8_t* internetprotocol_payload, uint32_t size) final;
 
             void send_udp_packet(UDPSocket* socket, const uint8_t* data, uint16_t size);
-            void recv_udp_packet(LibNet::address::ipv4_address_t source, LibNet::address::ipv4_address_t destination, uint8_t* internetprotocol_payload, uint32_t size) final;
+            void recv_udp_packet(LibNet::address::ipv4_address_t source, LibNet::address::ipv4_address_t destination, uint8_t* internetprotocol_payload, uint32_t size);
 
             UDPSocket* connect(const MaxOS::string& address);
             UDPSocket* connect(LibNet::address::ipv4_address_t ip, LibNet::address::port_t port);

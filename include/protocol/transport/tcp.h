@@ -108,7 +108,7 @@ namespace NetServer::protocol::transport {
             bool handle_packet(LibNet::address::ipv4_address_t source_ip, LibNet::address::ipv4_address_t destination_ip, uint8_t* internetprotocol_payload, uint32_t size) override;
 
             void send_tcp_packet(TCPSocket* socket, const uint8_t* data, uint16_t size, uint16_t flags = 0);
-            bool recv_tcp_packet(LibNet::address::ipv4_address_t source, LibNet::address::ipv4_address_t destination, uint8_t* internetprotocol_payload, uint32_t size) override;
+            bool recv_tcp_packet(LibNet::address::ipv4_address_t source, LibNet::address::ipv4_address_t destination, uint8_t* internetprotocol_payload, uint32_t size);
 
             TCPSocket* connect(const MaxOS::string& address);
             TCPSocket* connect(LibNet::address::ipv4_address_t ip, LibNet::address::port_t port);

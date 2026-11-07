@@ -15,7 +15,7 @@ namespace NetServer::network {
         private:
             RoutingTable m_routing_table;
 
-            MaxOS::common::Vector<NetworkStack*> m_interfaces;
+            MaxOS::common::Map<interface::Interface*, NetworkStack*> m_interfaces;
 
         public:
             NetworkManager();

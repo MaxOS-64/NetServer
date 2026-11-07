@@ -12,7 +12,7 @@ namespace NetServer::network {
 
     typedef struct Route {
 
-        LibNet::address::Subnet destination;
+        LibNet::address::Subnet subnet;
         LibNet::address::ipv4_address_t gateway;
         interface::Interface* interface;
 
@@ -21,13 +21,17 @@ namespace NetServer::network {
     class RoutingTable {
 
         private:
-            MaxOS::common::Vector<Route> m_routes;
+            MaxOS::common::Vector<route_t> m_routes = {};
 
         public:
-            const Route* lookup(LibNet::address::ipv4_address_t destination);
 
-            void add_route(const Route& route);
-            void remove_route(const Route& route);
+            RoutingTable();
+            ~RoutingTable();
+
+            const route_t* lookup(LibNet::address::ipv4_address_t destination);
+
+            void add_route(route_t& route);
+            void remove_route(route_t& route);
     };
 
 }
